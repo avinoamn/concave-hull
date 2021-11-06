@@ -3,7 +3,7 @@ package github.avinoamn.concaveHull;
 import java.util.*;
 import java.util.stream.IntStream;
 import org.locationtech.jts.geom.*;
-import org.locationtech.jts.algorithm.*;
+import github.avinoamn.concaveHull.utils.Utils;
 
 public class ConcaveHull {
     public static MultiPolygon concaveHull(MultiPolygon multiPolygon) {
@@ -91,7 +91,7 @@ public class ConcaveHull {
                             LRingCoords[currCoordIndex + 2] :
                             LRingCoords[currCoordIndex == 0 ? LRingCoords.length - 2 : currCoordIndex - 1]);
 
-                    if (!isIntersectionTestLineStart && crosses(head1, tail1, head2, tail2, intersectionCoord)) {
+                    if (!isIntersectionTestLineStart && Utils.crosses(head1, tail1, head2, tail2, intersectionCoord)) {
                         Collections.reverse(validCoords);
                         validCoords.add(intersectionCoord);
                         if (!isCurrLineStart) validCoords.add(0, intersectionCoord);
@@ -109,22 +109,6 @@ public class ConcaveHull {
             LinearRing fixedLRing = factory.createLinearRing(validCoords.toArray(Coordinate[]::new));
 
             return concaveHull(fixedLRing, currCoordIndex + 1);
-        }
-    }
-
-    public static double angleBetweenClockwise(Coordinate tip1, Coordinate tail, Coordinate tip2) {
-        return (360 - Angle.toDegrees(Angle.angleBetweenOriented(tip1, tail, tip2))) % 360;
-    }
-
-    public static boolean crosses(Coordinate head1, Coordinate tail1, Coordinate head2, Coordinate tail2, Coordinate intersection) {
-        double a1 = angleBetweenClockwise(head1, intersection, head2);
-        double a2 = angleBetweenClockwise(head1, intersection, tail2);
-        double a3 = angleBetweenClockwise(head1, intersection, tail1);
-
-        if (a1 < a2) {
-            return a3 >= a1 && a3 <= a2;
-        } else {
-            return a3 >= a2 && a3 <= a1;
         }
     }
 }
