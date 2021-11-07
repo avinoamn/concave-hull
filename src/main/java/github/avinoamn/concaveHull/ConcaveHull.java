@@ -42,43 +42,61 @@ public class ConcaveHull {
     }
 
     public static LinearRing concaveHull(LinearRing linearRing) {
-        return concaveHull(linearRing, 0);
+        GeometryFactory factory = linearRing.getFactory();
+
+        LineString lineString = factory.createLineString(linearRing.getCoordinateSequence());
+        LineString fixedLineString = concaveHull(lineString);
+
+        return factory.createLinearRing(fixedLineString.getCoordinateSequence());
     }
 
-    private static LinearRing concaveHull(LinearRing linearRing, int currCoordIndex) {
-        if (linearRing.getNumPoints() - 3 <= currCoordIndex) {
-            return linearRing;
+    public static LineString concaveHull(LineString lineString) {
+        boolean isLRing = lineString.getStartPoint().equals(lineString.getEndPoint());
+        return concaveHull(lineString, 0, isLRing);
+    }
+
+    private static LineString concaveHull(LineString lineString, int currCoordIndex, boolean isLRing) {
+        if (lineString.getNumPoints() - 3 <= currCoordIndex) {
+            return lineString;
         } else {
-            GeometryFactory factory = linearRing.getFactory();
+            GeometryFactory factory = lineString.getFactory();
 
-            Coordinate[] LRingCoords = linearRing.getCoordinates();
+            Coordinate[] LSCoords = lineString.getCoordinates();
 
-            LineString currLine = factory.createLineString(new Coordinate[] {LRingCoords[currCoordIndex], LRingCoords[currCoordIndex + 1]});
+            LineString currLine = factory.createLineString(new Coordinate[] {LSCoords[currCoordIndex], LSCoords[currCoordIndex + 1]});
 
-            List<Coordinate> LRingHead = Arrays.asList(Arrays.copyOfRange(LRingCoords, 0, currCoordIndex + 1));
-            List<Coordinate> LRingTail = Arrays.asList(Arrays.copyOfRange(LRingCoords, currCoordIndex + 2, LRingCoords.length));
+            List<Coordinate> LSHead = Arrays.asList(Arrays.copyOfRange(LSCoords, 0, currCoordIndex + 1));
+            List<Coordinate> LSTail = Arrays.asList(Arrays.copyOfRange(LSCoords, currCoordIndex + 2, LSCoords.length));
 
             List<Coordinate> validCoords = new ArrayList<Coordinate>();
-            validCoords.add(LRingCoords[currCoordIndex + 1]);
-            validCoords.add(LRingCoords[currCoordIndex + 2]);
+            validCoords.add(LSCoords[currCoordIndex + 1]);
+            validCoords.add(LSCoords[currCoordIndex + 2]);
 
-            int forLoopIterations = LRingTail.size() - (currCoordIndex == 0 ? 1 : 0) - 1;
-            for (int testCoordIndex = 0; testCoordIndex < forLoopIterations; testCoordIndex++) {
+            for (int testCoordIndex = 0; testCoordIndex < LSTail.size() - 1; testCoordIndex++) {
                 LineString intersectionTestLine = factory.createLineString(new Coordinate[]
-                    {LRingTail.get(testCoordIndex), LRingTail.get(testCoordIndex + 1)});
+                    {LSTail.get(testCoordIndex), LSTail.get(testCoordIndex + 1)});
 
                 Coordinate intersectionCoord = currLine.intersection(intersectionTestLine).getCoordinate();
                 
-                if (intersectionCoord != null) {
-                    boolean isCurrLineStart = currLine.getStartPoint().getCoordinate().equals(intersectionCoord);
-                    boolean isCurrLineEnd = currLine.getEndPoint().getCoordinate().equals(intersectionCoord);
-                    boolean isIntersectionTestLineStart = intersectionTestLine.getStartPoint().getCoordinate().equals(intersectionCoord);
-                    boolean isIntersectionTestLineEnd = intersectionTestLine.getEndPoint().getCoordinate().equals(intersectionCoord);
+                boolean isFirstCurrLine = currCoordIndex == 0;
+                boolean isCurrLineStart = currLine.getStartPoint().getCoordinate().equals(intersectionCoord);
+                boolean isCurrLineEnd = currLine.getEndPoint().getCoordinate().equals(intersectionCoord);
+                boolean isLastIntersectionTestLine = testCoordIndex == LSTail.size() - 2;
+                boolean isIntersectionTestLineStart = intersectionTestLine.getStartPoint().getCoordinate().equals(intersectionCoord);
+                boolean isIntersectionTestLineEnd = intersectionTestLine.getEndPoint().getCoordinate().equals(intersectionCoord);
 
+                boolean intersects = !(
+                    intersectionCoord == null ||
+                    isIntersectionTestLineStart ||
+                    (isIntersectionTestLineEnd && isLastIntersectionTestLine) ||
+                    (isCurrLineStart && ((isFirstCurrLine && !isLRing) || !isFirstCurrLine))
+                );
+
+                if (intersects) {
                     Coordinate head1 = intersectionTestLine.getStartPoint().getCoordinate();
                     
                     Coordinate tail1 = isIntersectionTestLineEnd ?
-                        LRingTail.get(testCoordIndex + 2) :
+                        LSTail.get(testCoordIndex + 2) :
                         intersectionTestLine.getEndPoint().getCoordinate();
                     
                     Coordinate head2 = isCurrLineStart ?
@@ -88,10 +106,10 @@ public class ConcaveHull {
                     Coordinate tail2 = !isCurrLineStart && !isCurrLineEnd ?
                         currLine.getEndPoint().getCoordinate() :
                         (isCurrLineEnd ?
-                            LRingCoords[currCoordIndex + 2] :
-                            LRingCoords[currCoordIndex == 0 ? LRingCoords.length - 2 : currCoordIndex - 1]);
+                            LSCoords[currCoordIndex + 2] :
+                            LSCoords[isFirstCurrLine ? LSCoords.length - 2 : currCoordIndex - 1]);
 
-                    if (!isIntersectionTestLineStart && Utils.crosses(head1, tail1, head2, tail2, intersectionCoord)) {
+                    if (Utils.crosses(head1, tail1, head2, tail2, intersectionCoord)) {
                         Collections.reverse(validCoords);
                         validCoords.add(intersectionCoord);
                         if (!isCurrLineStart) validCoords.add(0, intersectionCoord);
@@ -104,11 +122,10 @@ public class ConcaveHull {
                 }
             }
 
-            validCoords.addAll(0, LRingHead);
-            if (currCoordIndex == 0) validCoords.add(LRingCoords[0]);
-            LinearRing fixedLRing = factory.createLinearRing(validCoords.toArray(Coordinate[]::new));
+            validCoords.addAll(0, LSHead);
+            LineString fixedLS = factory.createLineString(validCoords.toArray(Coordinate[]::new));
 
-            return concaveHull(fixedLRing, currCoordIndex + 1);
+            return concaveHull(fixedLS, currCoordIndex + 1, isLRing);
         }
     }
 }
