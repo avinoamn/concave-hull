@@ -66,22 +66,21 @@ public class ConcaveHull {
             LineString currLine = factory.createLineString(new Coordinate[] {LSCoords[currCoordIndex], LSCoords[currCoordIndex + 1]});
 
             List<Coordinate> LSHead = Arrays.asList(Arrays.copyOfRange(LSCoords, 0, currCoordIndex + 1));
-            List<Coordinate> LSTail = Arrays.asList(Arrays.copyOfRange(LSCoords, currCoordIndex + 2, LSCoords.length));
 
             List<Coordinate> validCoords = new ArrayList<Coordinate>();
             validCoords.add(LSCoords[currCoordIndex + 1]);
             validCoords.add(LSCoords[currCoordIndex + 2]);
 
-            for (int testCoordIndex = 0; testCoordIndex < LSTail.size() - 1; testCoordIndex++) {
+            for (int testCoordIndex = currCoordIndex + 2; testCoordIndex < LSCoords.length - 1; testCoordIndex++) {
                 LineString intersectionTestLine = factory.createLineString(new Coordinate[]
-                    {LSTail.get(testCoordIndex), LSTail.get(testCoordIndex + 1)});
+                    {LSCoords[testCoordIndex], LSCoords[testCoordIndex + 1]});
 
                 Coordinate intersectionCoord = currLine.intersection(intersectionTestLine).getCoordinate();
                 
                 boolean isCurrLineFirst = currCoordIndex == 0;
                 boolean isCurrLineStart = currLine.getStartPoint().getCoordinate().equals(intersectionCoord);
                 boolean isCurrLineEnd = currLine.getEndPoint().getCoordinate().equals(intersectionCoord);
-                boolean isIntersectionTestLineLast = testCoordIndex == LSTail.size() - 2;
+                boolean isIntersectionTestLineLast = testCoordIndex == LSCoords.length - 2;
                 boolean isIntersectionTestLineStart = intersectionTestLine.getStartPoint().getCoordinate().equals(intersectionCoord);
                 boolean isIntersectionTestLineEnd = intersectionTestLine.getEndPoint().getCoordinate().equals(intersectionCoord);
 
@@ -96,7 +95,7 @@ public class ConcaveHull {
                     Coordinate intersectionTestLineHead = intersectionTestLine.getStartPoint().getCoordinate();
                     
                     Coordinate intersectionTestLineTail = isIntersectionTestLineEnd ?
-                        LSTail.get(testCoordIndex + 2) :
+                        LSCoords[testCoordIndex + 2] :
                         intersectionTestLine.getEndPoint().getCoordinate();
                     
                     Coordinate currLineHead = isCurrLineStart ?
