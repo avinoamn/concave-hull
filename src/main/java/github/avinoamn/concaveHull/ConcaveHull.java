@@ -78,44 +78,42 @@ public class ConcaveHull {
 
                 Coordinate intersectionCoord = currLine.intersection(intersectionTestLine).getCoordinate();
                 
-                boolean isFirstCurrLine = currCoordIndex == 0;
+                boolean isCurrLineFirst = currCoordIndex == 0;
                 boolean isCurrLineStart = currLine.getStartPoint().getCoordinate().equals(intersectionCoord);
                 boolean isCurrLineEnd = currLine.getEndPoint().getCoordinate().equals(intersectionCoord);
-                boolean isLastIntersectionTestLine = testCoordIndex == LSTail.size() - 2;
+                boolean isIntersectionTestLineLast = testCoordIndex == LSTail.size() - 2;
                 boolean isIntersectionTestLineStart = intersectionTestLine.getStartPoint().getCoordinate().equals(intersectionCoord);
                 boolean isIntersectionTestLineEnd = intersectionTestLine.getEndPoint().getCoordinate().equals(intersectionCoord);
 
                 boolean intersects = !(
                     intersectionCoord == null ||
                     isIntersectionTestLineStart ||
-                    (isIntersectionTestLineEnd && isLastIntersectionTestLine) ||
-                    (isCurrLineStart && ((isFirstCurrLine && !isLRing) || !isFirstCurrLine))
+                    (isIntersectionTestLineEnd && isIntersectionTestLineLast) ||
+                    (isCurrLineStart && ((isCurrLineFirst && !isLRing) || !isCurrLineFirst))
                 );
 
                 if (intersects) {
-                    Coordinate head1 = intersectionTestLine.getStartPoint().getCoordinate();
+                    Coordinate intersectionTestLineHead = intersectionTestLine.getStartPoint().getCoordinate();
                     
-                    Coordinate tail1 = isIntersectionTestLineEnd ?
+                    Coordinate intersectionTestLineTail = isIntersectionTestLineEnd ?
                         LSTail.get(testCoordIndex + 2) :
                         intersectionTestLine.getEndPoint().getCoordinate();
                     
-                    Coordinate head2 = isCurrLineStart ?
-                        currLine.getEndPoint().getCoordinate() :
+                    Coordinate currLineHead = isCurrLineStart ?
+                        LSCoords[isCurrLineFirst ? LSCoords.length - 2 : currCoordIndex - 1] :
                         currLine.getStartPoint().getCoordinate();
                     
-                    Coordinate tail2 = !isCurrLineStart && !isCurrLineEnd ?
-                        currLine.getEndPoint().getCoordinate() :
-                        (isCurrLineEnd ?
-                            LSCoords[currCoordIndex + 2] :
-                            LSCoords[isFirstCurrLine ? LSCoords.length - 2 : currCoordIndex - 1]);
+                    Coordinate currLineTail = isCurrLineEnd ?
+                        LSCoords[currCoordIndex + 2] :
+                        currLine.getEndPoint().getCoordinate();
 
-                    if (Utils.crosses(head1, tail1, head2, tail2, intersectionCoord)) {
+                    if (Utils.crosses(intersectionTestLineHead, intersectionTestLineTail, currLineHead, currLineTail, intersectionCoord)) {
                         Collections.reverse(validCoords);
                         validCoords.add(intersectionCoord);
                         if (!isCurrLineStart) validCoords.add(0, intersectionCoord);
-                        if (!isIntersectionTestLineEnd) validCoords.add(tail1);
+                        if (!isIntersectionTestLineEnd) validCoords.add(currLineTail);
                     } else {
-                        validCoords.add(isIntersectionTestLineEnd ? intersectionCoord : tail1);
+                        validCoords.add(isIntersectionTestLineEnd ? intersectionCoord : currLineTail);
                     }
                 } else {
                     validCoords.add(intersectionTestLine.getEndPoint().getCoordinate());
