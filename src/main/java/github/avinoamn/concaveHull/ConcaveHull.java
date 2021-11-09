@@ -111,9 +111,9 @@ public class ConcaveHull {
                         Collections.reverse(validCoords);
                         validCoords.add(intersectionCoord);
                         if (!isCurrLineStart) validCoords.add(0, intersectionCoord);
-                        if (!isIntersectionTestLineEnd) validCoords.add(currLineTail);
+                        if (!isIntersectionTestLineEnd) validCoords.add(intersectionTestLineTail);
                     } else {
-                        validCoords.add(isIntersectionTestLineEnd ? intersectionCoord : currLineTail);
+                        validCoords.add(isIntersectionTestLineEnd ? intersectionCoord : intersectionTestLineTail);
                     }
                 } else {
                     validCoords.add(intersectionTestLine.getEndPoint().getCoordinate());
