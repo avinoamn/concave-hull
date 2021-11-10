@@ -6,6 +6,20 @@ import org.locationtech.jts.geom.*;
 import github.avinoamn.concaveHull.utils.Utils;
 
 public class ConcaveHull {
+    private static GeometryFactory factory;
+
+    private static Coordinate[] LSCoords;
+    private static List<Coordinate> validCoords;
+
+    private static boolean isLRing;
+    
+    private static boolean isCurrLineFirst;
+    private static boolean isCurrLineStart;
+    private static boolean isCurrLineEnd;
+    private static boolean isIterationLineLast;
+    private static boolean isIterationLineStart;
+    private static boolean isIterationLineEnd;
+
     public static MultiPolygon concaveHull(MultiPolygon multiPolygon) {
         GeometryFactory factory = multiPolygon.getFactory();
         List<Polygon> fixedPolygons = new ArrayList<Polygon>();
@@ -64,78 +78,84 @@ public class ConcaveHull {
     }
 
     public static LineString concaveHull(LineString lineString) {
-        boolean isLRing = lineString.getStartPoint().equals(lineString.getEndPoint());
-        return concaveHull(lineString, 0, isLRing);
+        factory = lineString.getFactory();
+        isLRing = lineString.getStartPoint().equals(lineString.getEndPoint());
+        
+        return concaveHull(lineString, 0);
     }
 
-    private static LineString concaveHull(LineString lineString, int currCoordIndex, boolean isLRing) {
-        if (lineString.getNumPoints() - 3 <= currCoordIndex) {
+    private static LineString concaveHull(LineString lineString, int currIndex) {
+        if (lineString.getNumPoints() - 3 <= currIndex) {
             return lineString;
         } else {
-            GeometryFactory factory = lineString.getFactory();
+            LSCoords = lineString.getCoordinates();
 
-            Coordinate[] LSCoords = lineString.getCoordinates();
+            validCoords = new ArrayList<Coordinate>();
+            validCoords.add(LSCoords[currIndex + 1]);
+            validCoords.add(LSCoords[currIndex + 2]);
 
-            LineString currLine = factory.createLineString(new Coordinate[] {LSCoords[currCoordIndex], LSCoords[currCoordIndex + 1]});
+            LineString currLine = factory.createLineString(new Coordinate[] {LSCoords[currIndex], LSCoords[currIndex + 1]});
+            
+            for (int iterationIndex = currIndex + 2; iterationIndex < LSCoords.length - 1; iterationIndex++) {
+                LineString iterationLine = factory.createLineString(new Coordinate[] {LSCoords[iterationIndex], LSCoords[iterationIndex + 1]});
+                Coordinate intersection = currLine.intersection(iterationLine).getCoordinate();
 
-            List<Coordinate> LSHead = Arrays.asList(Arrays.copyOfRange(LSCoords, 0, currCoordIndex + 1));
-
-            List<Coordinate> validCoords = new ArrayList<Coordinate>();
-            validCoords.add(LSCoords[currCoordIndex + 1]);
-            validCoords.add(LSCoords[currCoordIndex + 2]);
-
-            for (int testCoordIndex = currCoordIndex + 2; testCoordIndex < LSCoords.length - 1; testCoordIndex++) {
-                LineString intersectionTestLine = factory.createLineString(new Coordinate[]
-                    {LSCoords[testCoordIndex], LSCoords[testCoordIndex + 1]});
-
-                Coordinate intersectionCoord = currLine.intersection(intersectionTestLine).getCoordinate();
-                
-                boolean isCurrLineFirst = currCoordIndex == 0;
-                boolean isCurrLineStart = currLine.getStartPoint().getCoordinate().equals(intersectionCoord);
-                boolean isCurrLineEnd = currLine.getEndPoint().getCoordinate().equals(intersectionCoord);
-                boolean isIntersectionTestLineLast = testCoordIndex == LSCoords.length - 2;
-                boolean isIntersectionTestLineStart = intersectionTestLine.getStartPoint().getCoordinate().equals(intersectionCoord);
-                boolean isIntersectionTestLineEnd = intersectionTestLine.getEndPoint().getCoordinate().equals(intersectionCoord);
-
-                boolean intersects = !(
-                    intersectionCoord == null ||
-                    isIntersectionTestLineStart ||
-                    (isIntersectionTestLineEnd && isIntersectionTestLineLast) ||
-                    (isCurrLineStart && ((isCurrLineFirst && !isLRing) || !isCurrLineFirst))
-                );
-
-                if (intersects) {
-                    Coordinate intersectionTestLineHead = intersectionTestLine.getStartPoint().getCoordinate();
-                    
-                    Coordinate intersectionTestLineTail = isIntersectionTestLineEnd ?
-                        LSCoords[testCoordIndex + 2] :
-                        intersectionTestLine.getEndPoint().getCoordinate();
-                    
-                    Coordinate currLineHead = isCurrLineStart ?
-                        LSCoords[isCurrLineFirst ? LSCoords.length - 2 : currCoordIndex - 1] :
-                        currLine.getStartPoint().getCoordinate();
-                    
-                    Coordinate currLineTail = isCurrLineEnd ?
-                        LSCoords[currCoordIndex + 2] :
-                        currLine.getEndPoint().getCoordinate();
-
-                    if (Utils.crosses(intersectionTestLineHead, intersectionTestLineTail, currLineHead, currLineTail, intersectionCoord)) {
-                        Collections.reverse(validCoords);
-                        validCoords.add(intersectionCoord);
-                        if (!isCurrLineStart) validCoords.add(0, intersectionCoord);
-                        if (!isIntersectionTestLineEnd) validCoords.add(intersectionTestLineTail);
-                    } else {
-                        validCoords.add(isIntersectionTestLineEnd ? intersectionCoord : intersectionTestLineTail);
-                    }
-                } else {
-                    validCoords.add(intersectionTestLine.getEndPoint().getCoordinate());
-                }
+                computeHull(currLine, currIndex, iterationLine, iterationIndex, intersection);
             }
 
-            validCoords.addAll(0, LSHead);
+            validCoords.addAll(0, Arrays.asList(Arrays.copyOfRange(LSCoords, 0, currIndex + 1)));
             LineString fixedLS = factory.createLineString(validCoords.toArray(Coordinate[]::new));
 
-            return concaveHull(fixedLS, currCoordIndex + 1, isLRing);
+            return concaveHull(fixedLS, currIndex + 1);
         }
+    }
+
+    private static void computeHull(LineString currLine, int currIndex, LineString iterationLine, int iterationIndex, Coordinate intersection) {
+        linesEdgesIntersection(currLine, currIndex, iterationLine, iterationIndex, intersection);
+
+        if (intersects(intersection)) {
+            Coordinate currLineHead = isCurrLineStart ?
+                LSCoords[isCurrLineFirst ? LSCoords.length - 2 : currIndex - 1] :
+                currLine.getStartPoint().getCoordinate();
+            
+            Coordinate currLineTail = isCurrLineEnd ?
+                LSCoords[currIndex + 2] :
+                currLine.getEndPoint().getCoordinate();
+
+            Coordinate iterationLineHead = iterationLine.getStartPoint().getCoordinate();
+            
+            Coordinate iterationLineTail = isIterationLineEnd ?
+                LSCoords[iterationIndex + 2] :
+                iterationLine.getEndPoint().getCoordinate();
+
+            if (Utils.crosses(currLineHead, currLineTail, iterationLineHead, iterationLineTail, intersection)) {
+                Collections.reverse(validCoords);
+                validCoords.add(intersection);
+                if (!isCurrLineStart) validCoords.add(0, intersection);
+                if (!isIterationLineEnd) validCoords.add(iterationLineTail);
+            } else {
+                validCoords.add(isIterationLineEnd ? intersection : iterationLineTail);
+            }
+        } else {
+            validCoords.add(iterationLine.getEndPoint().getCoordinate());
+        }
+    }
+
+    private static void linesEdgesIntersection(LineString currLine, int currIndex, LineString iterationLine, int iterationIndex, Coordinate intersection) {
+        isCurrLineFirst = currIndex == 0;
+        isCurrLineStart = currLine.getStartPoint().getCoordinate().equals(intersection);
+        isCurrLineEnd = currLine.getEndPoint().getCoordinate().equals(intersection);
+        isIterationLineLast = iterationIndex == LSCoords.length - 2;
+        isIterationLineStart = iterationLine.getStartPoint().getCoordinate().equals(intersection);
+        isIterationLineEnd = iterationLine.getEndPoint().getCoordinate().equals(intersection);
+    }
+
+    private static boolean intersects(Coordinate intersection) {
+        return !(
+            intersection == null ||
+            isIterationLineStart ||
+            (isIterationLineEnd && isIterationLineLast) ||
+            (isCurrLineStart && ((isCurrLineFirst && !isLRing) || !isCurrLineFirst))
+        );
     }
 }
