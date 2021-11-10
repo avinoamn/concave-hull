@@ -50,6 +50,19 @@ public class ConcaveHull {
         return factory.createLinearRing(fixedLineString.getCoordinateSequence());
     }
 
+    public static MultiLineString concaveHull(MultiLineString multiLineString) {
+        GeometryFactory factory = multiLineString.getFactory();
+        List<LineString> fixedLineStrings = new ArrayList<LineString>();
+
+        IntStream.range(0, multiLineString.getNumGeometries()).forEach(i -> {
+            LineString lineString = (LineString) multiLineString.getGeometryN(i);
+            LineString fixedLineString = concaveHull(lineString);
+            fixedLineStrings.add(fixedLineString);
+        });
+        
+        return factory.createMultiLineString(fixedLineStrings.toArray(LineString[]::new));
+    }
+
     public static LineString concaveHull(LineString lineString) {
         boolean isLRing = lineString.getStartPoint().equals(lineString.getEndPoint());
         return concaveHull(lineString, 0, isLRing);
