@@ -5,21 +5,30 @@ import java.util.stream.IntStream;
 import org.locationtech.jts.geom.*;
 import github.avinoamn.concaveHull.utils.Utils;
 
+/**
+ * Computes the concave hull of a {@link Geometry}.
+ * The concave hull is the smallest concave Geometry that contains all the
+ * points in the input Geometry without self intersection.
+ */
 public class ConcaveHull {
     private static GeometryFactory factory;
 
     private static Coordinate[] LSCoords;
-    private static List<Coordinate> validCoords;
+    private static List<Coordinate> validCoords = new ArrayList<Coordinate>();
 
-    private static boolean isLRing;
+    private static boolean isLRing;                 // Is `lineString` a linearRing (closing itself)
     
-    private static boolean isCurrLineFirst;
-    private static boolean isCurrLineStart;
-    private static boolean isCurrLineEnd;
-    private static boolean isIterationLineLast;
-    private static boolean isIterationLineStart;
-    private static boolean isIterationLineEnd;
+    private static boolean isCurrLineFirst;         // Is `currLine` the first line of `lineString`
+    private static boolean isIterationLineLast;     // Is `iterationLine` the last line of `lineString`
 
+    private static boolean isCurrLineStart;         // Is the intersection at the start of `currLine`
+    private static boolean isCurrLineEnd;           // Is the intersection at the end of `currLine`
+    private static boolean isIterationLineStart;    // Is the intersection at the start of `iterationLine`
+    private static boolean isIterationLineEnd;      // Is the intersection at the end of `iterationLine`
+
+    /**
+     * 
+     */
     public static MultiPolygon concaveHull(MultiPolygon multiPolygon) {
         GeometryFactory factory = multiPolygon.getFactory();
         List<Polygon> fixedPolygons = new ArrayList<Polygon>();
@@ -33,6 +42,9 @@ public class ConcaveHull {
         return factory.createMultiPolygon(fixedPolygons.toArray(Polygon[]::new));
     }
     
+    /**
+     * 
+     */
     public static Polygon concaveHull(Polygon polygon) {
         GeometryFactory factory = polygon.getFactory();
         Geometry boundary = polygon.getBoundary();
@@ -55,15 +67,9 @@ public class ConcaveHull {
         }
     }
 
-    public static LinearRing concaveHull(LinearRing linearRing) {
-        GeometryFactory factory = linearRing.getFactory();
-
-        LineString lineString = factory.createLineString(linearRing.getCoordinateSequence());
-        LineString fixedLineString = concaveHull(lineString);
-
-        return factory.createLinearRing(fixedLineString.getCoordinateSequence());
-    }
-
+    /**
+     * 
+     */
     public static MultiLineString concaveHull(MultiLineString multiLineString) {
         GeometryFactory factory = multiLineString.getFactory();
         List<LineString> fixedLineStrings = new ArrayList<LineString>();
@@ -77,20 +83,39 @@ public class ConcaveHull {
         return factory.createMultiLineString(fixedLineStrings.toArray(LineString[]::new));
     }
 
+    /**
+     * 
+     */
+    public static LinearRing concaveHull(LinearRing linearRing) {
+        GeometryFactory factory = linearRing.getFactory();
+
+        LineString lineString = factory.createLineString(linearRing.getCoordinateSequence());
+        LineString fixedLineString = concaveHull(lineString);
+
+        return factory.createLinearRing(fixedLineString.getCoordinateSequence());
+    }
+
+    /**
+     * 
+     */
     public static LineString concaveHull(LineString lineString) {
         factory = lineString.getFactory();
         isLRing = lineString.getStartPoint().equals(lineString.getEndPoint());
         
-        return concaveHull(lineString, 0);
+        return getConcaveHull(lineString, 0);
     }
 
-    private static LineString concaveHull(LineString lineString, int currIndex) {
+    /**
+     * Recursive function that iterates over the lines of `lineString`
+     * and computes hull for current line intersection with the iteration lines
+     */
+    private static LineString getConcaveHull(LineString lineString, int currIndex) {
         if (lineString.getNumPoints() - 3 <= currIndex) {
             return lineString;
         } else {
             LSCoords = lineString.getCoordinates();
 
-            validCoords = new ArrayList<Coordinate>();
+            validCoords.clear();
             validCoords.add(LSCoords[currIndex + 1]);
             validCoords.add(LSCoords[currIndex + 2]);
 
@@ -106,12 +131,15 @@ public class ConcaveHull {
             validCoords.addAll(0, Arrays.asList(Arrays.copyOfRange(LSCoords, 0, currIndex + 1)));
             LineString fixedLS = factory.createLineString(validCoords.toArray(Coordinate[]::new));
 
-            return concaveHull(fixedLS, currIndex + 1);
+            return getConcaveHull(fixedLS, currIndex + 1);
         }
     }
 
+    /**
+     * 
+     */
     private static void computeHull(LineString currLine, int currIndex, LineString iterationLine, int iterationIndex, Coordinate intersection) {
-        linesEdgesIntersection(currLine, currIndex, iterationLine, iterationIndex, intersection);
+        linesIntersectionInfo(currLine, currIndex, iterationLine, iterationIndex, intersection);
 
         if (intersects(intersection)) {
             Coordinate currLineHead = isCurrLineStart ?
@@ -141,15 +169,27 @@ public class ConcaveHull {
         }
     }
 
-    private static void linesEdgesIntersection(LineString currLine, int currIndex, LineString iterationLine, int iterationIndex, Coordinate intersection) {
+    /**
+     * Set lines intersection information to the fitting class variables 
+     */
+    private static void linesIntersectionInfo(LineString currLine, int currIndex, LineString iterationLine, int iterationIndex, Coordinate intersection) {
         isCurrLineFirst = currIndex == 0;
+        isIterationLineLast = iterationIndex == LSCoords.length - 2;
+
         isCurrLineStart = currLine.getStartPoint().getCoordinate().equals(intersection);
         isCurrLineEnd = currLine.getEndPoint().getCoordinate().equals(intersection);
-        isIterationLineLast = iterationIndex == LSCoords.length - 2;
         isIterationLineStart = iterationLine.getStartPoint().getCoordinate().equals(intersection);
         isIterationLineEnd = iterationLine.getEndPoint().getCoordinate().equals(intersection);
     }
 
+    /**
+     * Return a {@link boolean} that represents whether we need to compute hull or not.
+     * 
+     * @return if there`s no intersection, a {@value false}
+     * if we already computed the hull in a previous line, a {@value false}
+     * if there's no following/previous line to compute the hull with, a {@value false} (can happen when isLRing equals false)
+     * else, a {@value true}
+     */
     private static boolean intersects(Coordinate intersection) {
         return !(
             intersection == null ||
