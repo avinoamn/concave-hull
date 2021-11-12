@@ -7,7 +7,7 @@ import github.avinoamn.concaveHull.utils.Utils;
 
 /**
  * Computes the concave hull of a {@link Geometry}.
- * The concave hull is the smallest concave Geometry that contains all the
+ * The concave hull is the fixed concave Geometry that contains all the
  * points in the input Geometry without self intersection.
  */
 public class ConcaveHull {
@@ -106,8 +106,15 @@ public class ConcaveHull {
     }
 
     /**
-     * Recursive function that iterates over the lines of `lineString`
-     * and computes hull for current line intersection with the iteration lines
+     * Returns a {@link Geometry} that represents the concave hull of the input
+     * geometry.
+     * 
+     * It iterates recursively over the lines of `lineString`
+     * and computes hull for current line intersections with its following lines.
+     * 
+     * @return if currIndex is of one of the last three coordinates in `lineString`, a {@link LineString}.
+     * else, calls `getConcaveHull` with the fixed lineString (as of this current line)
+     * and the next index, then return its return value, a {@link LineString}.
      */
     private static LineString getConcaveHull(LineString lineString, int currIndex) {
         if (lineString.getNumPoints() - 3 <= currIndex) {
@@ -115,11 +122,11 @@ public class ConcaveHull {
         } else {
             LSCoords = lineString.getCoordinates();
 
+            LineString currLine = factory.createLineString(new Coordinate[] {LSCoords[currIndex], LSCoords[currIndex + 1]});
+
             validCoords.clear();
             validCoords.add(LSCoords[currIndex + 1]);
             validCoords.add(LSCoords[currIndex + 2]);
-
-            LineString currLine = factory.createLineString(new Coordinate[] {LSCoords[currIndex], LSCoords[currIndex + 1]});
             
             for (int iterationIndex = currIndex + 2; iterationIndex < LSCoords.length - 1; iterationIndex++) {
                 LineString iterationLine = factory.createLineString(new Coordinate[] {LSCoords[iterationIndex], LSCoords[iterationIndex + 1]});
@@ -136,25 +143,24 @@ public class ConcaveHull {
     }
 
     /**
+     * Computes hull for lines intersection.
      * 
+     * If the lines cross each other, it will reverse the
+     * `validCoords` list and add the intersection coordinates at both ends (Unless the
+     * intersection coordinate is also the start of `currLine` or the end of `iterationLine`. In
+     * these cases the intersection coordinate is already at the edges).
+     * 
+     * Else, theres either no intersection or the lines are only touching and not crossing, it will
+     * add the end of `iterationLine` to the `validCoords` list.
      */
     private static void computeHull(LineString currLine, int currIndex, LineString iterationLine, int iterationIndex, Coordinate intersection) {
         linesIntersectionInfo(currLine, currIndex, iterationLine, iterationIndex, intersection);
 
         if (intersects(intersection)) {
-            Coordinate currLineHead = isCurrLineStart ?
-                LSCoords[isCurrLineFirst ? LSCoords.length - 2 : currIndex - 1] :
-                currLine.getStartPoint().getCoordinate();
-            
-            Coordinate currLineTail = isCurrLineEnd ?
-                LSCoords[currIndex + 2] :
-                currLine.getEndPoint().getCoordinate();
-
-            Coordinate iterationLineHead = iterationLine.getStartPoint().getCoordinate();
-            
-            Coordinate iterationLineTail = isIterationLineEnd ?
-                LSCoords[iterationIndex + 2] :
-                iterationLine.getEndPoint().getCoordinate();
+            Coordinate currLineHead = isCurrLineStart ? getPreviousCoordinate(currIndex) : getStartCoordinate(currLine);
+            Coordinate currLineTail = isCurrLineEnd ? getFollowingCoordinate(currIndex) : getEndCoordinate(currLine);
+            Coordinate iterationLineHead = getStartCoordinate(iterationLine);
+            Coordinate iterationLineTail = isIterationLineEnd ? getFollowingCoordinate(iterationIndex) : getEndCoordinate(iterationLine);
 
             if (Utils.crosses(currLineHead, currLineTail, iterationLineHead, iterationLineTail, intersection)) {
                 Collections.reverse(validCoords);
@@ -162,10 +168,10 @@ public class ConcaveHull {
                 if (!isCurrLineStart) validCoords.add(0, intersection);
                 if (!isIterationLineEnd) validCoords.add(iterationLineTail);
             } else {
-                validCoords.add(isIterationLineEnd ? intersection : iterationLineTail);
+                validCoords.add(getEndCoordinate(iterationLine));
             }
         } else {
-            validCoords.add(iterationLine.getEndPoint().getCoordinate());
+            validCoords.add(getEndCoordinate(iterationLine));
         }
     }
 
@@ -176,10 +182,10 @@ public class ConcaveHull {
         isCurrLineFirst = currIndex == 0;
         isIterationLineLast = iterationIndex == LSCoords.length - 2;
 
-        isCurrLineStart = currLine.getStartPoint().getCoordinate().equals(intersection);
-        isCurrLineEnd = currLine.getEndPoint().getCoordinate().equals(intersection);
-        isIterationLineStart = iterationLine.getStartPoint().getCoordinate().equals(intersection);
-        isIterationLineEnd = iterationLine.getEndPoint().getCoordinate().equals(intersection);
+        isCurrLineStart = getStartCoordinate(currLine).equals(intersection);
+        isCurrLineEnd = getEndCoordinate(currLine).equals(intersection);
+        isIterationLineStart = getStartCoordinate(iterationLine).equals(intersection);
+        isIterationLineEnd = getEndCoordinate(iterationLine).equals(intersection);
     }
 
     /**
@@ -197,5 +203,21 @@ public class ConcaveHull {
             (isIterationLineEnd && isIterationLineLast) ||
             (isCurrLineStart && ((isCurrLineFirst && !isLRing) || !isCurrLineFirst))
         );
+    }
+
+    private static Coordinate getPreviousCoordinate(int index) {
+        return LSCoords[index == 0 ? LSCoords.length - 2 : index - 1];
+    }
+
+    private static Coordinate getFollowingCoordinate(int index) {
+        return LSCoords[index + 2];
+    }
+
+    private static Coordinate getStartCoordinate(LineString line) {
+        return line.getStartPoint().getCoordinate();
+    }
+
+    private static Coordinate getEndCoordinate(LineString line) {
+        return line.getEndPoint().getCoordinate();
     }
 }
