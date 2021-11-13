@@ -26,9 +26,6 @@ public class ConcaveHull {
     private static boolean isIterationLineStart;    // Is the intersection at the start of `iterationLine`
     private static boolean isIterationLineEnd;      // Is the intersection at the end of `iterationLine`
 
-    /**
-     * 
-     */
     public static MultiPolygon concaveHull(MultiPolygon multiPolygon) {
         GeometryFactory factory = multiPolygon.getFactory();
         List<Polygon> fixedPolygons = new ArrayList<Polygon>();
@@ -41,10 +38,7 @@ public class ConcaveHull {
         
         return factory.createMultiPolygon(fixedPolygons.toArray(Polygon[]::new));
     }
-    
-    /**
-     * 
-     */
+
     public static Polygon concaveHull(Polygon polygon) {
         GeometryFactory factory = polygon.getFactory();
         Geometry boundary = polygon.getBoundary();
@@ -67,9 +61,6 @@ public class ConcaveHull {
         }
     }
 
-    /**
-     * 
-     */
     public static MultiLineString concaveHull(MultiLineString multiLineString) {
         GeometryFactory factory = multiLineString.getFactory();
         List<LineString> fixedLineStrings = new ArrayList<LineString>();
@@ -83,9 +74,6 @@ public class ConcaveHull {
         return factory.createMultiLineString(fixedLineStrings.toArray(LineString[]::new));
     }
 
-    /**
-     * 
-     */
     public static LinearRing concaveHull(LinearRing linearRing) {
         GeometryFactory factory = linearRing.getFactory();
 
@@ -95,9 +83,6 @@ public class ConcaveHull {
         return factory.createLinearRing(fixedLineString.getCoordinateSequence());
     }
 
-    /**
-     * 
-     */
     public static LineString concaveHull(LineString lineString) {
         factory = lineString.getFactory();
         isLRing = lineString.getStartPoint().equals(lineString.getEndPoint());
@@ -205,18 +190,32 @@ public class ConcaveHull {
         );
     }
 
+    /**
+     * @param index that represent the start coordinate index of a line
+     * @return a coordinate previous to the start of the line, {@link Coordinate}
+     */
     private static Coordinate getPreviousCoordinate(int index) {
         return LSCoords[index == 0 ? LSCoords.length - 2 : index - 1];
     }
 
+    /**
+     * @param index that represent the start coordinate index of a line
+     * @return a coordinate following the end of the line, {@link Coordinate}
+     */
     private static Coordinate getFollowingCoordinate(int index) {
         return LSCoords[index + 2];
     }
 
+    /**
+     * @return the start coordinate of `line`, a {@link Coordinate}
+     */
     private static Coordinate getStartCoordinate(LineString line) {
         return line.getStartPoint().getCoordinate();
     }
 
+    /**
+     * @return the end coordinate of `line`, a {@link Coordinate}
+     */
     private static Coordinate getEndCoordinate(LineString line) {
         return line.getEndPoint().getCoordinate();
     }
